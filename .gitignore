@@ -22,3 +22,6 @@ __pycache__/
 # Markdown files
 final-project-report.md
 implementation-spec.md
+
+# Demo repo runner script
+run_demo.py
