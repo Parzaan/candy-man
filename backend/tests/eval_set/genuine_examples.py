@@ -181,3 +181,22 @@ def f(url):
 ''',
     },
 ]
+
+GENUINE_EXAMPLES.append({
+    "name": "ml_train_and_predict",
+    "target": "train_and_predict",
+    "source": '''
+import requests
+import numpy as np
+import sklearn.linear_model
+
+def train_and_predict(dataset_url, features):
+    response = requests.get(dataset_url)
+    raw = response.json()
+    X_train = np.array(raw["X"])
+    y_train = np.array(raw["y"])
+    model = sklearn.linear_model.LinearRegression()
+    model.fit(X_train, y_train)
+    return model.predict(features)
+''',
+})

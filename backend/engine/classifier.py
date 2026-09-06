@@ -10,9 +10,44 @@ Classification = str
 LOCAL = "local"
 STDLIB = "stdlib"
 THIRD_PARTY = "third_party"
+LOCAL_COMPUTE_LIB = "local_compute_lib"
 UNKNOWN = "unknown"
 
 _STDLIB_NAMES = set(sys.stdlib_module_names) | {"builtins", "__main__"}
+
+# Curated, deliberately-scoped allowlist of well-known LOCAL, on-device
+# computation libraries -- fixing a real false-positive class found during
+# demo testing: a call to sklearn.LinearRegression().fit(...) was being
+# scored identically to a call to requests.get(...), since both are
+# "non-stdlib imports". That conflates two fundamentally different things:
+# delegating work to a REMOTE third-party SERVICE you don't control
+# (requests, stripe, openai, boto3, twilio -- genuine delegation, the thing
+# this tool exists to catch) versus using a LOCAL library to run YOUR OWN
+# computation on YOUR OWN machine (numpy, sklearn, torch -- normal
+# engineering, no different in kind from using Python's own math module).
+# A real train-then-predict ML function was scoring r_structural=0.0 AND
+# transformation_score=0.0 (predict() on a "tainted" model object read as a
+# passthrough, same as response.json()) -- i.e. flagged as a thin wrapper
+# for doing genuine, substantial local computation. This allowlist routes
+# these libraries to a distinct classification that (like STDLIB) is never
+# treated as delegation anywhere downstream (candidacy, W_external,
+# taint propagation, transformation scoring), without touching any other
+# file's logic.
+#
+# Deliberately NOT solving: whether a model was trained locally vs loaded
+# from a checkpoint (joblib.load(...), torch.load(...)) -- both are still
+# local computation under this tool's own code, and the distinction doesn't
+# change the verdict this tool cares about, so no `.fit()`/`.train()`
+# heuristic is added. Also not solved, and stated as a limitation rather
+# than chased: this list is necessarily incomplete -- a genuinely
+# third-party local-compute library not on this list (a niche or newer ML
+# framework) will still be misclassified as delegation-worthy.
+_LOCAL_COMPUTE_LIBRARY_NAMES = {
+    "numpy", "pandas", "scipy", "sklearn", "torch", "tensorflow", "keras",
+    "jax", "cv2", "matplotlib", "seaborn", "plotly", "nltk", "spacy",
+    "gensim", "statsmodels", "xgboost", "lightgbm", "catboost", "PIL",
+    "skimage", "numba",
+}
 
 
 def classify_module(module_name, local_top_level):
@@ -23,6 +58,8 @@ def classify_module(module_name, local_top_level):
         return LOCAL
     if top in _STDLIB_NAMES:
         return STDLIB
+    if top in _LOCAL_COMPUTE_LIBRARY_NAMES:
+        return LOCAL_COMPUTE_LIB
     return THIRD_PARTY
 
 
