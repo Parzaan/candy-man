@@ -24,6 +24,11 @@ export default function FunctionDetail({ func }) {
           </ul>
         </div>
       )}
+      <p style={{ fontSize: '0.8rem', fontStyle: 'italic', opacity: 0.75, marginTop: '0.75rem' }}>
+        This rank is a deterministic review-priority ordering (lower = more wrapper-like on
+        both signals), not a probability of wrongdoing. Check the evidence lines yourself
+        before drawing any conclusion.
+      </p>
     </div>
   );
 }

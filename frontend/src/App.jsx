@@ -27,7 +27,21 @@ function App() {
     <div className="candy-man-app">
       <header className="app-header">
         <h1>🍬 Candy-Man</h1>
-        <p className="app-subtitle">Wrapper Function & Technical Debt Detection Engine</p>
+        <p className="app-subtitle">Genuine Implementation vs. Thin Wrapper Verifier</p>
+        <p
+          className="app-disclaimer"
+          style={{
+            fontSize: '0.85rem',
+            fontStyle: 'italic',
+            opacity: 0.8,
+            maxWidth: '640px',
+            margin: '0.5rem auto 0',
+          }}
+        >
+          Candy-Man flags functions that look wrapper-like around third-party calls.
+          Every flag is a review signal for a human reviewer to check by hand —
+          never proof of cheating, plagiarism, or low-quality work.
+        </p>
       </header>
 
       <main className="app-main">
@@ -42,6 +56,15 @@ function App() {
         {results && (
           <>
             <ResultsSummary results={results} />
+            {results.unscannable_files && results.unscannable_files.length > 0 && (
+              <div
+                className="unscannable-notice"
+                style={{ fontSize: '0.85rem', opacity: 0.8, margin: '0.5rem 0' }}
+              >
+                {results.unscannable_files.length} file(s) could not be parsed and were skipped:{' '}
+                {results.unscannable_files.join(', ')}
+              </div>
+            )}
             <ResultsTable flagged={results.flagged} />
           </>
         )}
