@@ -1,14 +1,3 @@
-"""
-Evaluation Set: genuine implementations
-=========================================
-Each entry is a small, self-contained source snippet plus the qualified name
-of the one function inside it that should be scored. These are all functions
-that call a third-party library but do real, original work around the call
--- Candy-Man must NOT flag any of them. Several are deliberately "tricky"
-(validation, multiple calls, extraction+further processing) because those
-are exactly the shapes a naive detector would false-positive on.
-"""
-
 GENUINE_EXAMPLES = [
     {
         "name": "arithmetic_after_call",
@@ -151,6 +140,44 @@ def hash_and_encode(payload):
     serialized = json.dumps(payload, sort_keys=True)
     digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     return {"payload": serialized, "digest": digest}
+''',
+    },
+    {
+        "name": "retry_and_cache",
+        "target": "process_and_cache",
+        "source": '''
+import requests
+
+def process_and_cache(cache, key, url):
+    if key in cache:
+        return cache[key]
+    for attempt in range(3):
+        try:
+            response = requests.get(url)
+            break
+        except Exception:
+            continue
+    else:
+        raise RuntimeError("all attempts failed")
+    cache[key] = response
+    return response
+''',
+    },
+    {
+        "name": "ratio_of_two_extracted_fields",
+        "target": "f",
+        "source": '''
+import requests
+
+def f(url):
+    raw = requests.get(url).json()
+    a1 = raw["x"]
+    a2 = a1
+    a3 = a2
+    b1 = raw["y"]
+    b2 = b1
+    b3 = b2
+    return a3 / b3
 ''',
     },
 ]
