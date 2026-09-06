@@ -244,3 +244,40 @@ def score_and_tag(url):
     return {"tag": data["tag"], "weighted_score": data["raw_score"] * 2.5}
 ''',
 })
+
+GENUINE_EXAMPLES.append({
+    "name": "three_way_elif_finds_middle_branch_computation",
+    "target": "resolve_discount",
+    "source": '''
+import requests
+
+def resolve_discount(url, mode):
+    data = requests.get(url).json()
+    if mode == "a":
+        output = {"v": "default"}
+    elif mode == "b":
+        output = {"v": data["x"] * 2}
+    else:
+        output = {"v": "default2"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "nested_two_levels_deep_safely_bails",
+    "target": "resolve_nested",
+    "source": '''
+import requests
+
+def resolve_nested(url, mode, sub):
+    data = requests.get(url).json()
+    if mode == "a":
+        if sub == "x":
+            output = {"v": data["score"] * 3}
+        else:
+            output = {"v": "default"}
+    else:
+        output = {"v": "default2"}
+    return output
+''',
+})

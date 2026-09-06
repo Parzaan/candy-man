@@ -130,20 +130,36 @@ def _collect_branch_assignments(name, if_stmt):
     """For the if-statement causing `name`'s branch-ambiguity, collect the
     relevant assignment to `name` from each mutually exclusive branch,
     recursing through elif chains (Python represents `elif` as a nested If
-    inside `orelse`). A branch that doesn't assign `name` at all is simply
-    skipped -- its absence doesn't add new ambiguity here."""
+    inside `orelse`).
+
+    Returns a list of Assign nodes if every relevant branch resolves to a
+    single direct assignment, or None if any branch assigns `name`
+    somewhere too deeply nested for this shallow lookup to resolve safely
+    (found via testing: a conditional nested two levels deep silently
+    vanished from consideration entirely rather than being flagged, which
+    let the OTHER branch's trivial value through with full, wrong
+    confidence). None tells the caller to bail out rather than proceed on
+    incomplete information -- consistent with this file's fail-safe design
+    everywhere else."""
     results = []
 
     body_assign = _last_assignment_in_block(name, if_stmt.body)
     if body_assign is not None:
         results.append(body_assign)
+    elif name in _names_assigned_in_block(if_stmt.body):
+        return None  # assigned in this branch, but too deep to resolve here
 
     if len(if_stmt.orelse) == 1 and isinstance(if_stmt.orelse[0], ast.If):
-        results.extend(_collect_branch_assignments(name, if_stmt.orelse[0]))
+        nested = _collect_branch_assignments(name, if_stmt.orelse[0])
+        if nested is None:
+            return None
+        results.extend(nested)
     else:
         orelse_assign = _last_assignment_in_block(name, if_stmt.orelse)
         if orelse_assign is not None:
             results.append(orelse_assign)
+        elif name in _names_assigned_in_block(if_stmt.orelse):
+            return None
 
     return results
 
