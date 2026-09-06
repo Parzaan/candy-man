@@ -200,3 +200,47 @@ def train_and_predict(dataset_url, features):
     return model.predict(features)
 ''',
 })
+
+GENUINE_EXAMPLES.append({
+    "name": "branch_ambiguous_real_computation_in_if",
+    "target": "get_profile",
+    "source": '''
+import requests
+
+def get_profile(user_id):
+    response = requests.get(f"/users/{user_id}").json()
+    if response.get("verified"):
+        output = {"name": response["name"], "trust": response["score"] * 1.5}
+    else:
+        output = {"name": "unknown"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "branch_merged_finds_real_computation_in_if",
+    "target": "get_profile",
+    "source": '''
+import requests
+
+def get_profile(user_id):
+    response = requests.get(f"/users/{user_id}").json()
+    if response.get("verified"):
+        output = {"name": response["name"], "trust": response["score"] * 1.5}
+    else:
+        output = {"name": "unknown"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "dict_reflects_best_inner_field_not_flat_cap",
+    "target": "score_and_tag",
+    "source": '''
+import requests
+
+def score_and_tag(url):
+    data = requests.get(url).json()
+    return {"tag": data["tag"], "weighted_score": data["raw_score"] * 2.5}
+''',
+})
