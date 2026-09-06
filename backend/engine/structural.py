@@ -1,22 +1,3 @@
-"""
-Step 2: Structural Complexity Scoring
-=======================================
-Computes R_structural: how much of a candidate function's own body is
-meaningful internal logic (W_internal) versus delegation to third-party
-calls, including method calls made on objects returned by third-party calls
-(W_external).
-
-R_structural is deliberately LOW for wrapper-like functions (mostly
-delegation, little original logic) and HIGH for functions that do real work
-around their external calls. See API_CONTRACT.md's worked example:
-`r_structural: 0.18` on a flagged (wrapper-like) function.
-
-Because the provided implementation-spec.md fixes the *architecture*
-(W_internal / W_external / housekeeping discount / raw ratio -> adjusted
-ratio) but not exact numeric weights, the constants below are this
-implementation's calibrated defaults -- each one is commented with the
-reasoning behind it so a judge can follow (and challenge) the scoring model.
-"""
 from __future__ import annotations
 
 import ast
@@ -33,55 +14,35 @@ from .classifier import (
     root_name_of,
 )
 
-# --- Calibrated weights -----------------------------------------------------
-# "Full" internal logic: an assignment/statement that performs a real
-# computation (arithmetic, comparisons, comprehensions, string building,
-# calls into the local codebase, subscript/attribute extraction, etc).
 W_INTERNAL_STATEMENT = 1.0
-# Loops represent iteration logic on top of whatever their body does.
 W_INTERNAL_LOOP = 1.5
-# A substantive if/elif branching decision earns a little extra credit for
-# the branching *itself*, on top of whatever its body statements earn
-# individually (iter_own_scope walks into the body separately).
 W_INTERNAL_BRANCH_DECISION = 0.5
 
-# Each direct third-party call, and each further method call made on a
-# variable that we can trace back to holding a third-party call's raw
-# result, counts as one unit of delegation.
 W_EXTERNAL_CALL = 1.0
 W_METHOD_ON_EXTERNAL = 1.0
 
-# "Housekeeping" statements are syntactically part of the function but do not
-# represent original problem-specific logic: input validation guard clauses,
-# defensive try/except scaffolding, context-manager boilerplate, asserts,
-# logging, and trivial renames/literal assignments. They still count toward
-# W_internal (a guard clause is still "in" the function), but at a steep
-# discount -- otherwise a thin wrapper could pad its structural score just by
-# adding a few `if x is None: raise ValueError(...)` guards.
-HOUSEKEEPING_DISCOUNT_RATE = 0.75  # housekeeping counts for only 25% of its raw weight
-W_HOUSEKEEPING_GUARD = 1.0     # `if <simple condition>: raise/return` early-exit validation
-W_HOUSEKEEPING_TRY = 0.5       # try/except scaffolding (body/handlers still walked individually)
-W_HOUSEKEEPING_WITH = 0.3      # `with` boilerplate
+HOUSEKEEPING_DISCOUNT_RATE = 0.75
+W_HOUSEKEEPING_GUARD = 1.0
+W_HOUSEKEEPING_TRY = 0.5
+W_HOUSEKEEPING_WITH = 0.3
 W_HOUSEKEEPING_ASSERT = 0.5
-W_HOUSEKEEPING_RAISE = 0.3     # a bare raise not already part of a counted guard
-W_HOUSEKEEPING_LOG_CALL = 0.3  # print/log/logger.* calls
-W_HOUSEKEEPING_TRIVIAL = 0.2   # `x = y` renames, `x = <literal>` assignments
+W_HOUSEKEEPING_RAISE = 0.3
+W_HOUSEKEEPING_LOG_CALL = 0.3
+W_HOUSEKEEPING_TRIVIAL = 0.2
 
-_LOG_CALL_NAMES = {
-    "print", "log", "debug", "info", "warn", "warning", "error", "exception", "critical",
-}
+_LOG_CALL_NAMES = {"print", "log", "debug", "info", "warn", "warning", "error", "exception", "critical"}
 
 
 class _Weighted:
     __slots__ = ("weight", "line", "is_housekeeping")
 
-    def __init__(self, weight: float, line: int, is_housekeeping: bool):
+    def __init__(self, weight, line, is_housekeeping):
         self.weight = weight
         self.line = line
         self.is_housekeeping = is_housekeeping
 
 
-def _is_logging_call(call: ast.Call, registry: ImportRegistry) -> bool:
+def _is_logging_call(call, registry):
     func = call.func
     if isinstance(func, ast.Attribute):
         if func.attr in _LOG_CALL_NAMES:
@@ -96,11 +57,7 @@ def _is_logging_call(call: ast.Call, registry: ImportRegistry) -> bool:
     return False
 
 
-def _is_external_ish_call(call: ast.Call, registry: ImportRegistry, tainted: Set[str]) -> bool:
-    """True for a direct third-party call, a method call on a tainted
-    variable, OR a method call chained directly onto another external-ish
-    call inline (e.g. `requests.get(x).json()` with no intermediate
-    variable) -- each hop of such a chain is still delegation."""
+def _is_external_ish_call(call, registry, tainted):
     if classify_call(call, registry) == THIRD_PARTY:
         return True
     if is_method_on_tainted(call, tainted):
@@ -114,12 +71,7 @@ def _is_external_ish_call(call: ast.Call, registry: ImportRegistry, tainted: Set
 _MUTATION_METHODS = {"append", "extend", "add", "insert", "update", "push"}
 
 
-def _is_pure_forwarding_mutation(call: ast.Call, registry: ImportRegistry, tainted: Set[str]) -> bool:
-    """`results.append(api.call(x))`-style: a call to a well-known collection
-    mutation method whose every argument is itself pure external/alias data
-    with no additional computation -- this is forwarding into a container,
-    not original logic, even though loops built purely from this pattern
-    still "look" like a statement doing something."""
+def _is_pure_forwarding_mutation(call, registry, tainted):
     func = call.func
     if not isinstance(func, ast.Attribute) or func.attr not in _MUTATION_METHODS:
         return False
@@ -129,26 +81,23 @@ def _is_pure_forwarding_mutation(call: ast.Call, registry: ImportRegistry, taint
     return all(_is_pure_external_or_alias(a, registry, tainted) for a in args)
 
 
-def _is_pure_external_or_alias(expr: ast.AST, registry: ImportRegistry, tainted: Set[str]) -> bool:
-    """True when `expr` is *exactly* a direct external call (including an
-    inline chain of calls entirely on external objects), or a bare alias of
-    an already-tainted variable -- i.e. the statement does nothing but
-    capture or hand back the external value, with zero additional
-    computation."""
+def _is_pure_external_or_alias(expr, registry, tainted):
     if isinstance(expr, ast.Call):
         return _is_external_ish_call(expr, registry, tainted)
     if isinstance(expr, ast.Name):
         return expr.id in tainted
+    if isinstance(expr, ast.Dict):
+        return all(_is_pure_external_or_alias(v, registry, tainted) for v in expr.values)
+    if isinstance(expr, (ast.List, ast.Tuple)):
+        return all(_is_pure_external_or_alias(e, registry, tainted) for e in expr.elts)
+    if isinstance(expr, ast.Subscript):
+        return _is_pure_external_or_alias(expr.value, registry, tainted)
+    if isinstance(expr, ast.Attribute):
+        return _is_pure_external_or_alias(expr.value, registry, tainted)
     return False
 
 
-def _loop_has_internal_work(node, registry: ImportRegistry, tainted: Set[str]) -> bool:
-    """A loop only earns the "iteration logic" bonus if its own body (one
-    level deep -- nested control flow is credited via its own classification
-    when iter_own_scope reaches it) contains at least one statement that
-    isn't purely forwarding an external value. Prevents `for x in xs:
-    results.append(api.call(x))` from being credited as if the loop itself
-    were meaningful processing."""
+def _loop_has_internal_work(node, registry, tainted):
     for stmt in node.body:
         for item in _classify_top_level_node(stmt, registry, tainted):
             if item.weight > 0 and not item.is_housekeeping:
@@ -156,7 +105,7 @@ def _loop_has_internal_work(node, registry: ImportRegistry, tainted: Set[str]) -
     return False
 
 
-def _is_trivial_literal_or_rename(expr: ast.AST) -> bool:
+def _is_trivial_literal_or_rename(expr):
     if isinstance(expr, ast.Name):
         return True
     if isinstance(expr, ast.Constant):
@@ -164,14 +113,8 @@ def _is_trivial_literal_or_rename(expr: ast.AST) -> bool:
     return False
 
 
-def _is_simple_guard_test(test: ast.AST) -> bool:
-    """A "simple" validation condition: a comparison, a plain/negated name or
-    attribute, an isinstance()/hasattr() check, or a boolean combination of
-    those. Deliberately conservative -- anything with function calls other
-    than isinstance/hasattr/len, or nested boolean logic beyond one level, is
-    NOT considered simple (and so the enclosing If is scored as ordinary
-    branching logic, not discounted housekeeping)."""
-    def is_simple_atom(node: ast.AST) -> bool:
+def _is_simple_guard_test(test):
+    def is_simple_atom(node):
         if isinstance(node, (ast.Name, ast.Attribute)):
             return True
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
@@ -187,10 +130,23 @@ def _is_simple_guard_test(test: ast.AST) -> bool:
     return is_simple_atom(test)
 
 
-def _is_guard_clause(node: ast.If) -> bool:
-    """`if <simple condition>: raise ...` or `if <simple condition>: return
-    ...` (optionally with a short logging/pass statement alongside), with no
-    `elif`/`else` branch -- the canonical input-validation guard clause."""
+def _is_trivial_return_value(value):
+    """A guard clause's return value only counts as 'exiting with nothing
+    meaningful' if it's None (bare `return`), a Constant, or a bare Name --
+    e.g. `return None`, `return []`, `return default`. A Return carrying a
+    computed/extracted value (Subscript, Attribute, Call, or any other
+    expression) is genuine conditional logic, not validation -- e.g. a
+    cache-hit early return -- and must not be discounted as housekeeping."""
+    if value is None:
+        return True
+    if isinstance(value, ast.Constant):
+        return True
+    if isinstance(value, ast.Name):
+        return True
+    return False
+
+
+def _is_guard_clause(node):
     if node.orelse:
         return False
     if not _is_simple_guard_test(node.test):
@@ -198,15 +154,15 @@ def _is_guard_clause(node: ast.If) -> bool:
     if not node.body or len(node.body) > 2:
         return False
     last = node.body[-1]
-    return isinstance(last, (ast.Raise, ast.Return))
+    if isinstance(last, ast.Raise):
+        return True
+    if isinstance(last, ast.Return):
+        return _is_trivial_return_value(last.value)
+    return False
 
 
-def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: Set[str]) -> List[_Weighted]:
-    """Classify a single node from iter_own_scope's flat traversal. Only
-    statement-shaped nodes contribute weight here; Call expressions are
-    handled separately in `_collect_calls` so external/method-call weight is
-    never conflated with the statement-level internal/housekeeping weight."""
-    out: List[_Weighted] = []
+def _classify_top_level_node(node, registry, tainted):
+    out = []
     line = getattr(node, "lineno", 0)
 
     if isinstance(node, ast.If):
@@ -214,14 +170,10 @@ def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: S
             out.append(_Weighted(W_HOUSEKEEPING_GUARD, line, True))
         else:
             out.append(_Weighted(W_INTERNAL_BRANCH_DECISION, line, False))
-        # body/orelse statements are separately yielded by iter_own_scope.
 
     elif isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
         if _loop_has_internal_work(node, registry, tainted):
             out.append(_Weighted(W_INTERNAL_LOOP, line, False))
-        # A loop whose body does nothing but forward external results into a
-        # container earns no bonus -- its individual statements (already
-        # walked separately by iter_own_scope) correctly contribute zero too.
 
     elif isinstance(node, (ast.Try,)):
         out.append(_Weighted(W_HOUSEKEEPING_TRY, line, True))
@@ -237,7 +189,7 @@ def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: S
 
     elif isinstance(node, ast.Assign):
         if _is_pure_external_or_alias(node.value, registry, tainted):
-            pass  # zero internal weight: this line does nothing but capture the external value
+            pass
         elif _is_trivial_literal_or_rename(node.value):
             out.append(_Weighted(W_HOUSEKEEPING_TRIVIAL, line, True))
         else:
@@ -246,7 +198,7 @@ def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: S
     elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
         value = getattr(node, "value", None)
         if value is None:
-            pass  # bare annotation, no computation
+            pass
         elif isinstance(node, ast.AnnAssign) and _is_pure_external_or_alias(value, registry, tainted):
             pass
         else:
@@ -259,16 +211,14 @@ def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: S
             or isinstance(value, ast.Constant)
             or _is_pure_external_or_alias(value, registry, tainted)
         ):
-            # A return expression that itself computes something (not just
-            # `return x` / `return api.call(y)`) is genuine internal work.
             out.append(_Weighted(W_INTERNAL_STATEMENT, line, False))
 
     elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
         call = node.value
         if _is_external_ish_call(call, registry, tainted):
-            pass  # counted as external weight in _collect_calls, not internal
+            pass
         elif _is_pure_forwarding_mutation(call, registry, tainted):
-            pass  # `results.append(api.call(x))` -- forwarding, not original logic
+            pass
         elif _is_logging_call(call, registry):
             out.append(_Weighted(W_HOUSEKEEPING_LOG_CALL, line, True))
         else:
@@ -277,8 +227,8 @@ def _classify_top_level_node(node: ast.AST, registry: ImportRegistry, tainted: S
     return out
 
 
-def _collect_calls(func_node, registry: ImportRegistry, tainted: Set[str]) -> List[_Weighted]:
-    out: List[_Weighted] = []
+def _collect_calls(func_node, registry, tainted):
+    out = []
     for node in iter_own_scope(func_node.body):
         if not isinstance(node, ast.Call):
             continue
@@ -297,34 +247,29 @@ _STATEMENT_NODE_TYPES = (
 
 
 def compute_structural_score(candidate: FunctionCandidate) -> dict:
-    """Computes R_structural and evidence lines for a candidate function.
-
-    Returns a dict with:
-      - r_structural: float in [0, 1], LOW means wrapper-like
-      - evidence_lines: sorted line numbers that drove the score
-      - w_internal / w_external / raw_ratio / housekeeping_fraction: debug
-        detail, useful for tests and the eval harness (not part of the
-        public API contract, which only needs r_structural + evidence_lines)
-    """
     func_node = candidate.node
     registry = candidate.import_registry
     tainted = build_taint_set(func_node.body, registry)
 
     evidence_lines: Set[int] = set()
 
-    # W_external: every direct third-party call plus every further method
-    # call made on an object we can trace back to a third-party call result.
+    consumed_ids: Set[int] = set()
+    for node in iter_own_scope(func_node.body):
+        if isinstance(node, ast.If) and _is_guard_clause(node):
+            for stmt in node.body:
+                consumed_ids.add(id(stmt))
+
     external_weight = 0.0
     for item in _collect_calls(func_node, registry, tainted):
         external_weight += item.weight
         evidence_lines.add(item.line)
 
-    # W_internal (full, pre-discount): every statement-level classification,
-    # split out so we know how much of it was "housekeeping".
     internal_weight_full = 0.0
     housekeeping_weight_full = 0.0
     for node in iter_own_scope(func_node.body):
         if not isinstance(node, _STATEMENT_NODE_TYPES):
+            continue
+        if id(node) in consumed_ids:
             continue
         for item in _classify_top_level_node(node, registry, tainted):
             internal_weight_full += item.weight
@@ -332,22 +277,15 @@ def compute_structural_score(candidate: FunctionCandidate) -> dict:
                 housekeeping_weight_full += item.weight
                 evidence_lines.add(item.line)
 
-    # Step 1: raw structural ratio, computed on full (undiscounted) weights.
     denom_raw = internal_weight_full + external_weight
     raw_ratio = (internal_weight_full / denom_raw) if denom_raw > 0 else 0.0
 
-    # Step 2: apply the housekeeping discount as an adjustment on top of the
-    # raw ratio -- the larger the fraction of "internal" weight that was
-    # actually just validation/logging/boilerplate, the more the raw ratio
-    # gets pulled down, since that weight didn't represent real problem logic.
     housekeeping_fraction = (
         housekeeping_weight_full / internal_weight_full if internal_weight_full > 0 else 0.0
     )
     discount_factor = 1.0 - (housekeeping_fraction * HOUSEKEEPING_DISCOUNT_RATE)
     r_structural = max(0.0, min(1.0, raw_ratio * discount_factor))
 
-    # Always surface the direct third-party call sites as evidence, even for
-    # the (rare) case a call was reclassified between candidacy and here.
     for c in candidate.external_calls:
         evidence_lines.add(c.line)
 

@@ -1,9 +1,11 @@
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field
+from typing import List
+from pydantic import BaseModel
+
 
 class ScanRequest(BaseModel):
-    target: str = Field(..., description="Local directory path or GitHub repository URL")
-    type: Literal["local", "github"] = Field(..., description="Target repository type")
+    target: str
+    type: str  # "local" | "github"
+
 
 class FlaggedFunction(BaseModel):
     function_name: str
@@ -15,12 +17,14 @@ class FlaggedFunction(BaseModel):
     transformation_computed: bool
     suspicion_rank: int
 
+
 class ScanResponse(BaseModel):
     repo: str
     total_functions_scanned: int
     candidates_considered: int
     unscannable_files: List[str]
     flagged: List[FlaggedFunction]
+
 
 class ErrorResponse(BaseModel):
     error: str

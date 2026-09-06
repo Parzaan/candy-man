@@ -1,8 +1,3 @@
-"""
-Candy-Man Backend FastAPI Server
-Provides POST /scan matching API_CONTRACT.md. Orchestration only -- every
-analysis algorithm lives in engine/*.py.
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -26,9 +21,6 @@ app.add_middleware(
 
 
 def run_pipeline(target: str, target_type: str) -> dict:
-    """Runs the full Step 0 -> Step 5 pipeline for one scan request and
-    returns a dict matching ScanResponse. Raises RepoLoadError on failure so
-    the route can translate it into the documented error response."""
     loaded = load_repository(target, target_type)
     try:
         total_scanned = count_all_functions(loaded.parsed_files)
@@ -69,7 +61,6 @@ def run_pipeline(target: str, target_type: str) -> dict:
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
 )
 async def scan_repository(request: ScanRequest):
-    """Scans a local path or GitHub repository for wrapper functions."""
     try:
         result = run_pipeline(request.target, request.type)
         return ScanResponse(**result)
@@ -78,7 +69,7 @@ async def scan_repository(request: ScanRequest):
             status_code=400,
             content=ErrorResponse(error=exc.code, message=exc.message).model_dump(),
         )
-    except Exception as exc:  # last-resort guard: a scan must never 500 with a bare traceback
+    except Exception as exc:
         return JSONResponse(
             status_code=500,
             content=ErrorResponse(
