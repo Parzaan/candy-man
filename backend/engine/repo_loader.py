@@ -114,10 +114,14 @@ def _clone_repo(target):
         git.Repo.clone_from(target, tmp_dir, depth=1)
     except GitCommandError as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise RepoLoadError("target_unreachable", f"Could not clone repository: {exc}") from exc
+        # Human-readable message, not the raw git CLI stderr dump (fixed
+        # after review -- that dump exposed internal command syntax and
+        # temp paths to end users for no benefit).
+        reason = "repository not found or not accessible" if "not found" in str(exc).lower() or "128" in str(exc) else "clone failed"
+        raise RepoLoadError("target_unreachable", f"Could not clone '{target}': {reason}. Check the URL and that the repository is public.") from exc
     except Exception as exc:
         shutil.rmtree(tmp_dir, ignore_errors=True)
-        raise RepoLoadError("target_unreachable", f"Could not clone repository: {exc}") from exc
+        raise RepoLoadError("target_unreachable", f"Could not clone '{target}': {type(exc).__name__}.") from exc
     return tmp_dir
 
 
