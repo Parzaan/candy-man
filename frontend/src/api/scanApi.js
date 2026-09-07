@@ -1,24 +1,25 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 /**
- * Sends a scan request to the backend POST /scan endpoint.
- * @param {string} target Local folder path or GitHub URL
- * @param {'local' | 'github'} type Target type
- * @returns {Promise<Object>} ScanResponse object matching API_CONTRACT.md
+ * Calls the real POST /scan endpoint. Throws an Error with a `.code` and
+ * `.detail` matching the backend's documented error shape (target_unreachable,
+ * not_a_git_repo, no_python_files_found, scan_failed) so the caller can show
+ * an honest, specific message rather than a generic failure.
  */
-export async function scanRepository(target, type = 'local') {
-  const response = await fetch(`${API_BASE_URL}/scan`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+export async function scanRepository(target, type) {
+  const response = await fetch(`${API_BASE}/scan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ target, type }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || errorData.error || 'Failed to scan repository');
+    const err = new Error(data.message || "Scan failed");
+    err.code = data.error || "scan_failed";
+    throw err;
   }
 
-  return response.json();
+  return data;
 }

@@ -1,61 +1,58 @@
-import React, { useState } from 'react';
-import FunctionDetail from './FunctionDetail';
+import { useState } from "react";
+import FunctionDetail from "./FunctionDetail";
 
 export default function ResultsTable({ flagged }) {
-  const [expandedRank, setExpandedRank] = useState(null);
+  const [expandedKey, setExpandedKey] = useState(null);
 
-  if (!flagged || flagged.length === 0) {
-    return <div className="no-flagged">No wrapper functions flagged in this repository.</div>;
+  if (flagged.length === 0) {
+    return (
+      <div className="empty-state">
+        <p>No functions were flagged in this scan.</p>
+        <p className="empty-state-sub">
+          Every candidate cleared at least one signal — nothing looked like a thin wrapper here.
+        </p>
+      </div>
+    );
   }
 
-  const toggleExpand = (rank) => {
-    setExpandedRank(expandedRank === rank ? null : rank);
-  };
-
   return (
-    <div className="results-table-container">
-      <table className="results-table">
-        <thead>
-          <tr>
-            <th>Rank</th>
-            <th>Function</th>
-            <th>File</th>
-            <th>Line</th>
-            <th>R Structural</th>
-            <th>Transform Score</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {flagged.map((item) => {
-            const isExpanded = expandedRank === item.suspicion_rank;
-            return (
-              <React.Fragment key={item.suspicion_rank}>
-                <tr className={isExpanded ? 'expanded-row' : ''}>
-                  <td>#{item.suspicion_rank}</td>
-                  <td><code>{item.function_name}</code></td>
-                  <td>{item.file}</td>
-                  <td>{item.def_line}</td>
-                  <td>{item.r_structural}</td>
-                  <td>{item.transformation_score}</td>
-                  <td>
-                    <button onClick={() => toggleExpand(item.suspicion_rank)}>
-                      {isExpanded ? 'Hide Details' : 'View Details'}
-                    </button>
-                  </td>
-                </tr>
-                {isExpanded && (
-                  <tr>
-                    <td colSpan={7}>
-                      <FunctionDetail func={item} />
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="results-table">
+      <h2>Ranked Flagged Functions ({flagged.length})</h2>
+
+      <div className="review-notice">
+        This register flags likely delegation wrappers with thin cyclomatic
+        shells. Open the code and judge architectural intent yourself.
+      </div>
+
+      {flagged.map((f) => {
+        const key = `${f.file}:${f.def_line}:${f.function_name}`;
+        const expanded = expandedKey === key;
+        return (
+          <div key={key} className={`result-row${expanded ? " result-row--expanded" : ""}`}>
+            <button
+              type="button"
+              className="result-row-header"
+              onClick={() => setExpandedKey(expanded ? null : key)}
+              aria-expanded={expanded}
+            >
+              <span className="result-rank mono">#{String(f.suspicion_rank).padStart(2, "0")}</span>
+              <span className="result-name-block">
+                <span className="result-name mono">{f.function_name}()</span>
+                <span className="result-location mono">{f.file} · L{f.def_line}</span>
+              </span>
+              <span className="result-scores mono">
+                Struct: {f.r_structural.toFixed(2)}
+                <span className="score-divider">·</span>
+                Trans: {f.transformation_computed ? f.transformation_score.toFixed(2) : "n/a"}
+              </span>
+              <span className="result-toggle mono">
+                Inspect Evidence {expanded ? "▲" : "▼"}
+              </span>
+            </button>
+            {expanded && <FunctionDetail func={f} />}
+          </div>
+        );
+      })}
     </div>
   );
 }

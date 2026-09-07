@@ -1,76 +1,77 @@
-import React, { useState } from 'react';
-import ScanForm from './components/ScanForm';
-import ResultsSummary from './components/ResultsSummary';
-import ResultsTable from './components/ResultsTable';
-import { scanRepository } from './api/scanApi';
-import './App.css';
+import { useState } from "react";
+import { scanRepository } from "./api/scanApi";
+import ScanForm from "./components/ScanForm";
+import ResultsSummary from "./components/ResultsSummary";
+import ResultsTable from "./components/ResultsTable";
+import candyManLogo from "./assets/candy-man-logo.png";
+import "./App.css";
 
-function App() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [results, setResults] = useState(null);
+export default function App() {
+  const [status, setStatus] = useState("idle"); // idle | loading | error | results
+  const [result, setResult] = useState(null);
+  const [errorInfo, setErrorInfo] = useState(null);
 
-  const handleScan = async (target, type) => {
-    setLoading(true);
-    setError(null);
+  const runScan = async (target, type) => {
+    setStatus("loading");
+    setErrorInfo(null);
     try {
       const data = await scanRepository(target, type);
-      setResults(data);
+      setResult(data);
+      setStatus("results");
     } catch (err) {
-      setError(err.message || 'An unexpected error occurred during scan.');
-    } finally {
-      setLoading(false);
+      setErrorInfo({ code: err.code, message: err.message });
+      setStatus("error");
     }
   };
 
-  return (
-    <div className="candy-man-app">
-      <header className="app-header">
-        <h1>🍬 Candy-Man</h1>
-        <p className="app-subtitle">Genuine Implementation vs. Thin Wrapper Verifier</p>
-        <p
-          className="app-disclaimer"
-          style={{
-            fontSize: '0.85rem',
-            fontStyle: 'italic',
-            opacity: 0.8,
-            maxWidth: '640px',
-            margin: '0.5rem auto 0',
-          }}
-        >
-          Candy-Man flags functions that look wrapper-like around third-party calls.
-          Every flag is a review signal for a human reviewer to check by hand —
-          never proof of cheating, plagiarism, or low-quality work.
-        </p>
-      </header>
+  const handlePickSample = (repoName) => {
+    runScan(`https://github.com/${repoName}`, "github");
+  };
 
-      <main className="app-main">
-        <ScanForm onScan={handleScan} loading={loading} />
+  const handleNewScan = () => {
+    setStatus("idle");
+    setResult(null);
+    setErrorInfo(null);
+  };
 
-        {error && (
-          <div className="error-banner">
-            <strong>Scan Error:</strong> {error}
+  if (status === "results" && result) {
+    return (
+      <div className="results-screen">
+        <header className="results-header">
+          <div className="results-header-left">
+            <img src={candyManLogo} alt="" className="logo-mark" />
+            <span className="eyebrow">Candy-Man // AST.Triage</span>
           </div>
-        )}
+          <button type="button" className="new-scan-button" onClick={handleNewScan}>
+            ← New Scan
+          </button>
+          <div className="results-header-right mono">
+            <span>{result.repo}</span>
+            <span className="score-divider">·</span>
+            <span>{result.scan_duration_seconds}s</span>
+          </div>
+        </header>
 
-        {results && (
-          <>
-            <ResultsSummary results={results} />
-            {results.unscannable_files && results.unscannable_files.length > 0 && (
-              <div
-                className="unscannable-notice"
-                style={{ fontSize: '0.85rem', opacity: 0.8, margin: '0.5rem 0' }}
-              >
-                {results.unscannable_files.length} file(s) could not be parsed and were skipped:{' '}
-                {results.unscannable_files.join(', ')}
-              </div>
-            )}
-            <ResultsTable flagged={results.flagged} />
-          </>
-        )}
-      </main>
-    </div>
+        <div className="results-title-block">
+          <h1>Triage Dossier &amp; Evidence Register</h1>
+          <p>
+            Structural-ratio and transformation-score evaluation for
+            candidate delegation wrappers, combined by a strict AND-gate.
+          </p>
+        </div>
+
+        <ResultsSummary result={result} />
+        <ResultsTable flagged={result.flagged} />
+      </div>
+    );
+  }
+
+  return (
+    <ScanForm
+      status={status}
+      errorInfo={errorInfo}
+      onScan={runScan}
+      onPickSample={handlePickSample}
+    />
   );
 }
-
-export default App;
