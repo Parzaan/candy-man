@@ -1,14 +1,3 @@
-"""
-Evaluation Set: genuine implementations
-=========================================
-Each entry is a small, self-contained source snippet plus the qualified name
-of the one function inside it that should be scored. These are all functions
-that call a third-party library but do real, original work around the call
--- Candy-Man must NOT flag any of them. Several are deliberately "tricky"
-(validation, multiple calls, extraction+further processing) because those
-are exactly the shapes a naive detector would false-positive on.
-"""
-
 GENUINE_EXAMPLES = [
     {
         "name": "arithmetic_after_call",
@@ -153,4 +142,142 @@ def hash_and_encode(payload):
     return {"payload": serialized, "digest": digest}
 ''',
     },
+    {
+        "name": "retry_and_cache",
+        "target": "process_and_cache",
+        "source": '''
+import requests
+
+def process_and_cache(cache, key, url):
+    if key in cache:
+        return cache[key]
+    for attempt in range(3):
+        try:
+            response = requests.get(url)
+            break
+        except Exception:
+            continue
+    else:
+        raise RuntimeError("all attempts failed")
+    cache[key] = response
+    return response
+''',
+    },
+    {
+        "name": "ratio_of_two_extracted_fields",
+        "target": "f",
+        "source": '''
+import requests
+
+def f(url):
+    raw = requests.get(url).json()
+    a1 = raw["x"]
+    a2 = a1
+    a3 = a2
+    b1 = raw["y"]
+    b2 = b1
+    b3 = b2
+    return a3 / b3
+''',
+    },
 ]
+
+GENUINE_EXAMPLES.append({
+    "name": "ml_train_and_predict",
+    "target": "train_and_predict",
+    "source": '''
+import requests
+import numpy as np
+import sklearn.linear_model
+
+def train_and_predict(dataset_url, features):
+    response = requests.get(dataset_url)
+    raw = response.json()
+    X_train = np.array(raw["X"])
+    y_train = np.array(raw["y"])
+    model = sklearn.linear_model.LinearRegression()
+    model.fit(X_train, y_train)
+    return model.predict(features)
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "branch_ambiguous_real_computation_in_if",
+    "target": "get_profile",
+    "source": '''
+import requests
+
+def get_profile(user_id):
+    response = requests.get(f"/users/{user_id}").json()
+    if response.get("verified"):
+        output = {"name": response["name"], "trust": response["score"] * 1.5}
+    else:
+        output = {"name": "unknown"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "branch_merged_finds_real_computation_in_if",
+    "target": "get_profile",
+    "source": '''
+import requests
+
+def get_profile(user_id):
+    response = requests.get(f"/users/{user_id}").json()
+    if response.get("verified"):
+        output = {"name": response["name"], "trust": response["score"] * 1.5}
+    else:
+        output = {"name": "unknown"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "dict_reflects_best_inner_field_not_flat_cap",
+    "target": "score_and_tag",
+    "source": '''
+import requests
+
+def score_and_tag(url):
+    data = requests.get(url).json()
+    return {"tag": data["tag"], "weighted_score": data["raw_score"] * 2.5}
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "three_way_elif_finds_middle_branch_computation",
+    "target": "resolve_discount",
+    "source": '''
+import requests
+
+def resolve_discount(url, mode):
+    data = requests.get(url).json()
+    if mode == "a":
+        output = {"v": "default"}
+    elif mode == "b":
+        output = {"v": data["x"] * 2}
+    else:
+        output = {"v": "default2"}
+    return output
+''',
+})
+
+GENUINE_EXAMPLES.append({
+    "name": "nested_two_levels_deep_safely_bails",
+    "target": "resolve_nested",
+    "source": '''
+import requests
+
+def resolve_nested(url, mode, sub):
+    data = requests.get(url).json()
+    if mode == "a":
+        if sub == "x":
+            output = {"v": data["score"] * 3}
+        else:
+            output = {"v": "default"}
+    else:
+        output = {"v": "default2"}
+    return output
+''',
+})

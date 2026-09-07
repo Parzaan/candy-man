@@ -41,14 +41,13 @@ probability of wrongdoing -- a flag is a signal for a human reviewer, never
 proof.
 """
 from __future__ import annotations
-
 from typing import Any, Dict, List
 
 STRUCTURAL_WRAPPER_THRESHOLD = 0.35
 TRANSFORMATION_WRAPPER_THRESHOLD = 0.30
 
 
-def _passes_and_gate(candidate: Dict[str, Any]) -> bool:
+def _passes_and_gate(candidate):
     if not candidate.get("transformation_computed", False):
         return False
     if candidate["r_structural"] > STRUCTURAL_WRAPPER_THRESHOLD:
@@ -58,47 +57,28 @@ def _passes_and_gate(candidate: Dict[str, Any]) -> bool:
     return True
 
 
-def _suspicion_score(candidate: Dict[str, Any]) -> float:
+def _suspicion_score(candidate):
     return candidate["r_structural"] * candidate["transformation_score"]
 
 
-def rank_and_format_results(
-    repo: str,
-    total_scanned: int,
-    candidates: List[Dict[str, Any]],
-    unscannable_files: List[str],
-) -> Dict[str, Any]:
-    """Filters candidates with the AND-gate, ranks the survivors, and builds
-    the final ScanResponse dict.
-
-    Each item in `candidates` is expected to carry:
-      function_name, file, def_line, evidence_lines,
-      r_structural, transformation_score, transformation_computed
-    (assembled by main.py from structural.compute_structural_score +
-    transformation.compute_transformation_score).
-    """
+def rank_and_format_results(repo, total_scanned, candidates, unscannable_files):
     passing = [c for c in candidates if _passes_and_gate(c)]
-
-    # Deterministic ordering: primary key is the suspicion product ascending
-    # (lower product = more suspicious = better rank); ties are broken by
-    # file path, then definition line, then function name so re-running the
-    # scan on unchanged code always yields the same ranking.
     passing.sort(key=lambda c: (_suspicion_score(c), c["file"], c["def_line"], c["function_name"]))
 
     flagged = []
     for rank, candidate in enumerate(passing, start=1):
-        flagged.append(
-            {
-                "function_name": candidate["function_name"],
-                "file": candidate["file"],
-                "def_line": candidate["def_line"],
-                "evidence_lines": sorted(set(candidate.get("evidence_lines", []))),
-                "r_structural": candidate["r_structural"],
-                "transformation_score": candidate["transformation_score"],
-                "transformation_computed": candidate["transformation_computed"],
-                "suspicion_rank": rank,
-            }
-        )
+        flagged.append({
+            "function_name": candidate["function_name"],
+            "file": candidate["file"],
+            "def_line": candidate["def_line"],
+            "evidence_lines": sorted(set(candidate.get("evidence_lines", []))),
+            "r_structural": candidate["r_structural"],
+            "transformation_score": candidate["transformation_score"],
+            "transformation_computed": candidate["transformation_computed"],
+            "suspicion_rank": rank,
+            "source_snippet": candidate.get("source_snippet", ""),
+            "snippet_start_line": candidate.get("snippet_start_line", candidate["def_line"]),
+        })
 
     return {
         "repo": repo,

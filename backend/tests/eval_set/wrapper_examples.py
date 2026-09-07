@@ -1,14 +1,3 @@
-"""
-Evaluation Set: thin wrapper implementations
-===============================================
-Each entry is a small, self-contained source snippet plus the qualified name
-of the one function inside it that should be scored. These are all thin
-wrappers around a third-party call -- Candy-Man SHOULD flag every one of
-them. Several are deliberately "tricky" (validation padding, logging,
-class-method adapters, multiple branches) because those are exactly the
-shapes wrappers use to *look* more substantial than they are.
-"""
-
 WRAPPER_EXAMPLES = [
     {
         "name": "direct_inline_return",
@@ -139,6 +128,24 @@ import requests
 
 def create_session(**kwargs):
     return requests.Session(**kwargs)
+''',
+    },
+    {
+        "name": "long_rename_chain_passthrough",
+        "target": "f",
+        "source": '''
+import requests
+
+def f(url):
+    a = requests.get(url)
+    b = a
+    c = b
+    d = c
+    e = d
+    g = e
+    h = g
+    i = h
+    return i
 ''',
     },
 ]
