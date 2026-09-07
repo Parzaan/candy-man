@@ -150,7 +150,6 @@ export default function ScanForm({ status, errorInfo, onScan, onPickSample }) {
 
       <footer className="scan-footer">
         <span className="mono">Python 3 codebases only · Candy-Man Static Analyzer · Ranked evidence triage</span>
-        <span className="mono">v1.0</span>
       </footer>
     </div>
   );

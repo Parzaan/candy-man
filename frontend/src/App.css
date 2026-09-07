@@ -1,17 +1,18 @@
 /* ===== Shared ===== */
 .eyebrow {
   font-family: var(--font-mono);
-  font-size: 20.2px;
+  font-size: 30.2px;
   font-weight: bold;
   color: var(--deep-mocha);
   letter-spacing: 0.06em;
   opacity: 0.75;
   cursor: pointer;
+  padding-bottom: 10px;
 }
 
 .logo-mark {
-  width: 104px;
-  height: 104px;
+  width: 154px;
+  height: 154px;
   cursor: pointer;
 }
 
@@ -23,10 +24,6 @@
   border-radius: 4px;
   display: flex;
   cursor: pointer;
-}
-
-.logo-button:hover {
-  background: var(--coral-glow-tint);
 }
 
 .mono {
@@ -69,7 +66,7 @@
   display: grid;
   grid-template-columns: 340px 1fr;
   gap: 48px;
-  padding: 48px 64px;
+  padding: 15px 64px;
   align-items: start;
 }
 
@@ -318,8 +315,6 @@
   align-items: center;
   gap: 24px;
   padding: 20px 64px;
-  border-bottom: 1px solid var(--border-soft);
-  position: sticky;
   top: 0;
   background: var(--floral-white);
   z-index: 10;
@@ -335,9 +330,11 @@
   background: none;
   border: 1px solid var(--border-soft-strong);
   border-radius: 4px;
-  padding: 7px 28px;
+  padding: 8px 28px;
   font-size: 17.6px;
   color: var(--deep-mocha);
+  position: relative;
+  top: -4px;
 }
 
 .results-header-right {
@@ -347,7 +344,7 @@
 }
 
 .results-title-block {
-  padding: 40px 64px 0;
+  padding: 5px 64px 0;
 }
 
 .results-title-block h1 {
