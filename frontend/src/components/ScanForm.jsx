@@ -17,6 +17,11 @@ export default function ScanForm({ status, errorInfo, onScan, onPickSample }) {
   const [mode, setMode] = useState("github"); // "github" | "local"
   const [target, setTarget] = useState("");
 
+  const handleLogoClick = () => {
+    setTarget("");
+    onReset();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!target.trim()) return;
@@ -26,8 +31,10 @@ export default function ScanForm({ status, errorInfo, onScan, onPickSample }) {
   return (
     <div className="scan-screen">
       <header className="scan-header">
-        <img src={candyManLogo} alt="" className="logo-mark" />
-        <span className="eyebrow">Candy-Man // AST.Triage</span>
+        <button type="button" className="logo-button" onClick={handleLogoClick} aria-label="Reset scan form">
+          <img src={candyManLogo} alt="" className="logo-mark" />
+        </button>
+        <span className="eyebrow">CANDY-MAN</span>
       </header>
 
       <div className="scan-layout">
@@ -130,7 +137,7 @@ export default function ScanForm({ status, errorInfo, onScan, onPickSample }) {
             </p>
 
             <button type="submit" className="scan-cta" disabled={status === "loading"}>
-              🍬 {status === "loading" ? "Scanning…" : "Scan Repository"}
+              {status === "loading" ? "Scanning…" : "Scan Repository"}
             </button>
           </form>
 

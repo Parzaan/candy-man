@@ -39,8 +39,10 @@ export default function App() {
       <div className="results-screen">
         <header className="results-header">
           <div className="results-header-left">
-            <img src={candyManLogo} alt="" className="logo-mark" />
-            <span className="eyebrow">Candy-Man // AST.Triage</span>
+            <button type="button" className="logo-button" onClick={handleNewScan} aria-label="Return to scan screen">
+              <img src={candyManLogo} alt="" className="logo-mark" />
+            </button>
+            <span className="eyebrow">CANDY-MAN</span>
           </div>
           <button type="button" className="new-scan-button" onClick={handleNewScan}>
             ← New Scan
@@ -48,7 +50,7 @@ export default function App() {
           <div className="results-header-right mono">
             <span>{result.repo}</span>
             <span className="score-divider">·</span>
-            <span>{result.scan_duration_seconds}s</span>
+            <span title="Server-side scan time">Scanned in {result.scan_duration_seconds}s</span>
           </div>
         </header>
 
@@ -72,6 +74,7 @@ export default function App() {
       errorInfo={errorInfo}
       onScan={runScan}
       onPickSample={handlePickSample}
+      onReset={handleNewScan}
     />
   );
 }

@@ -2,8 +2,9 @@ import { useState } from "react";
 
 const STRUCTURAL_THRESHOLD = 0.35;
 const TRANSFORMATION_THRESHOLD = 0.30;
-const PLOT_W = 600;
-const PLOT_H = 380;
+const PLOT_W = 1400;
+const PLOT_H = 650;
+const LABEL_SPACE = 40;
 const PAD = 36;
 
 function toPlotX(r) {
@@ -34,7 +35,7 @@ function SuspicionScatter({ candidates }) {
         function to be flagged.
       </p>
 
-      <svg viewBox={`0 0 ${PLOT_W} ${PLOT_H}`} className="scatter-svg" role="img" aria-label="Scatter plot of candidate functions by structural ratio and transformation score">
+      <svg viewBox={`0 0 ${PLOT_W} ${PLOT_H + LABEL_SPACE}`} className="scatter-svg" role="img" aria-label="Scatter plot of candidate functions by structural ratio and transformation score">
         {/* flagged region shading */}
         <rect
           x={PAD}
@@ -58,20 +59,21 @@ function SuspicionScatter({ candidates }) {
             key={`${c.file}:${c.def_line}:${c.function_name}`}
             cx={toPlotX(c.r_structural)}
             cy={toPlotY(c.transformation_computed ? c.transformation_score : 1)}
-            r={hovered === c ? 7 : 5}
+            r={hovered === c ? 16 : 12}
             fill={severityColor(c.r_structural, c.transformation_score, c.transformation_computed)}
             stroke="var(--floral-white)"
             strokeWidth="1.5"
+            style={{ cursor: "pointer" }}
             onMouseEnter={() => setHovered(c)}
             onMouseLeave={() => setHovered(null)}
           />
         ))}
 
         {/* axis labels */}
-        <text x={PLOT_W / 2} y={PLOT_H - 6} textAnchor="middle" className="axis-label">
+        <text x={PLOT_W / 2} y={PLOT_H + 26} textAnchor="middle" className="axis-label">
           Structural Ratio →
         </text>
-        <text x={12} y={PLOT_H / 2} textAnchor="middle" className="axis-label" transform={`rotate(-90 12 ${PLOT_H / 2})`}>
+        <text x={12} y={PLOT_H / 2 - 26} textAnchor="middle" className="axis-label" transform={`rotate(-90 12 ${PLOT_H / 2})`}>
           Transformation Score →
         </text>
       </svg>
